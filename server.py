@@ -1,20 +1,67 @@
+import psutil
 import os
-import http.server
-from os import curdir, sep
-import socketserver
+import json
+import requests
 
-from http import HTTPStatus
+def get_disk_usage():
+ #Gets the disk usage of persistent storage.
 
-class Handler(http.server.SimpleHTTPRequestHandler):
-    def do_GET(self):
-        full_file = curdir + sep + 'index.html'
-        f = open(full_file)
-        self.send_response(HTTPStatus.OK)
-        self.send_header('Content-type', 'text/html')
-        self.end_headers()
-        self.wfile.write(f.read().encode())
+ mount_path = "/var/lib/data"
+ usage = psutil.disk_usage(mount_path)
 
-port = int(os.getenv('PORT', 80))
-print('Listening on port %s' % (port))
-httpd = socketserver.TCPServer(('', port), Handler)
-httpd.serve_forever()
+ return {
+   "total": usage.total / (1024 ** 3),
+   "used": usage.used / (1024 ** 3),
+   "free": usage.free / (1024 ** 3)
+ }
+
+def send_slack_alert(disk_usage_info):
+  endpoint = os.environ.get('SLACK_WEBHOOK_URI')
+
+  # Create a Slack message attachment
+  attachment = {
+    	"text": "Disk Space Usage",
+    	"fields": [
+        	{
+            	"title": "Used",
+            	"value": str(disk_usage_info['used']),
+            	"short": True
+        	},
+        	{
+            	"title": "Free",
+            	"value": str(disk_usage_info['free']),
+            	"short": True
+        	},
+        	{
+            	"title": "Total",
+            	"value": str(disk_usage_info['total']),
+            	"short": True
+        	}
+    	]
+	}
+ 
+  # Create the main message payload
+  payload = {
+	"attachments": [attachment]
+	}
+ 
+  # Convert the payload to JSON format
+  json_data = json.dumps(payload)
+ 
+  headers = {
+    	"Content-type": "application/json"
+	}
+ 
+  requests.post(endpoint, data=json_data, headers=headers)
+
+if __name__ == "__main__":
+ disk_info = get_disk_usage()
+
+ print(disk_info)
+
+ threshold_level = 10
+
+ if(disk_info['free'] < threshold_level):
+   print('Alert! Disk space is below the set threshold level.')
+
+send_slack_alert(disk_info)
