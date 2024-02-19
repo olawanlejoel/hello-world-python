@@ -3,7 +3,7 @@ import psutil
 def get_disk_usage():
  #Gets the disk usage of persistent storage.
 
- mount_path = "<YOUR-PERSISTENT-STORAGE-MOUNT-PATH>"
+ mount_path = "/var/lib/data"
  usage = psutil.disk_usage(mount_path)
 
  return {
